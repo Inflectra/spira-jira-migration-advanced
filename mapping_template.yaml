@@ -1,0 +1,222 @@
+#
+# This is the mapping configuration file for the different digital artifacts between Jira and SpiraPlan.
+#
+
+# Priority mapping between priorities in jira (left, key) and spira (right, value), e.g. <jira>: <spira>.
+# These values have to be strings. Ints need to be casted to strings in yaml (surround with double or single quotes).
+# The second level is the mapping for the specific artifact.
+# The needed mapped artifact types are: requirements, incidents, and tasks for product issue migration flow and capabilities for program issue migration flow.
+# Values provided are example values.
+priorities:
+  capabilities:
+    "1": High
+    "2": High
+    "3": Medium
+    "4": Low
+    "5": Low
+  requirements:
+    "1": 1 - Critical
+    "2": 2 - High
+    "3": 3 - Medium
+    "4": 4 - Low
+    "5": 5 - Very Low
+  incidents:
+    "1": 1 - Critical
+    "2": 2 - High
+    "3": 3 - Medium
+    "4": 4 - Low
+    "5": 5 - Very Low
+  tasks:
+    "1": 1 - Critical
+    "2": 2 - High
+    "3": 3 - Medium
+    "4": 4 - Low
+    "5": 5 - Very Low
+
+# Status mapping between statuses in jira (left, key) and spira (right, value), e.g. <jira>: <spira>
+# These values have to be strings. Ints need to be casted to strings in yaml (surround with double or single quotes).
+# The second level is the mapping for the specific artifact.
+# The needed mapped artifact types are: requirements, incidents, and tasks for product issue migration flow and capabilities for program issue migration flow.
+# Values provided are example values.
+statuses:
+  capabilities:
+    Open: To Do
+    In Progress: In Progress
+    Reopened: To Do
+    Resolved: Done
+    Closed: Rejected
+    To Do: To Do
+    Done: Done
+    Preparing: Reviewing
+    Review: Reviewing
+    Verified: Ready
+    New: To Do
+    Solved: Done
+    Implementing: In Progress
+    Ready: Ready
+    Assigned: In Progress
+    Planned: Reviewing
+  requirements:
+    Open: Requested
+    In Progress: In Progress
+    Reopened: Requested
+    Resolved: Completed
+    Closed: Rejected
+    To Do: Planned
+    Done: Completed
+    Preparing: Design in Process
+    Review: Ready for Review
+    Verified: Tested
+    New: Requested
+    Solved: Completed
+    Implementing: Planned
+    Ready: Developed
+    Assigned: Accepted
+    Planned: Planned
+  incidents:
+    Open: Open
+    In Progress: Assigned
+    Reopened: Reopen
+    Resolved: Resolved
+    Closed: Closed
+    To Do: Assigned
+    Done: Closed
+    Preparing: Open
+    Review: Open
+    Verified: Open
+    New: New
+    Solved: Closed
+    Implementing: Open
+    Ready: Open
+    Assigned: Assigned
+    Planned: Open
+  tasks:
+    Open: Not Started
+    In Progress: In Progress
+    Reopened: Deferred
+    Resolved: Completed
+    Closed: Completed
+    To Do: Not Started
+    Done: Completed
+    Preparing: Under Review
+    Review: Under Review
+    Verified: Not Started
+    New: Not Started
+    Solved: Completed
+    Implementing: In Progress
+    Ready: Completed
+    Assigned: In Progress
+    Planned: Not Started
+
+# Mapping of release and milestone statuses from Jira (left, key) to Spira (right, value). Status mapping, but with another structure.
+# Jira does not have statuses per say on versions but it can be derived from comparable values from Spiras release statuses.
+# Jira have boolean values for archived and released, which gives us 4 combinations we can use to map to 4 statuses in Spira.
+release_statuses:
+  not_archived_and_not_released: Planned
+  not_archived_and_released: Completed
+  archived_and_not_released: Cancelled
+  archived_and_released: Completed
+milestone_statuses:
+  not_archived_and_not_released: To Do
+  not_archived_and_released: Done
+  archived_and_not_released: Rejected
+  archived_and_released: Done
+
+# Custom properties on different program and product level artifacts.
+# Jira have plugins and other variables that does not not exist in Spira. Spira though, can handle custom properties that you add to the different artifacts.
+# These are the mappings for how to map values in Jira to Spira.
+# Second level hierarchy is are the artifacts on which to map the custom properties.
+# The third level is a list of the different custom properties in this format:
+#
+# - spira_name: <value>                                                   # The name of the spira custom field that is targeted, case sensitive.
+#   jira_key: <value>                                                     # The specific field in issue["fields"] to fetch the value from. NOTE: Exlusively use this field or the jira_custom_field_name.
+#   jira_custom_field_name: <value>                                       # The specific custom_field_name in issue["fields"] we want to fetch the value from. NOTE: Exlusively use this field or the jira_key.
+#   type: <date|date_time|text|multiselect_list|rich_text|list|decimal>   # The type of the data that spira can handle.
+
+custom_props:
+  capabilities:
+    - spira_name:
+      jira_key:
+      jira_custom_field_name:
+      type:
+    - spira_name:
+      jira_key:
+      jira_custom_field_name:
+      type:
+
+  requirements:
+    - spira_name:
+      jira_key:
+      jira_custom_field_name:
+      type:
+    - spira_name:
+      jira_key:
+      jira_custom_field_name:
+      type:
+
+  incidents:
+    - spira_name:
+      jira_key:
+      jira_custom_field_name:
+      type:
+    - spira_name:
+      jira_key:
+      jira_custom_field_name:
+      type:
+
+  tasks:
+    - spira_name:
+      jira_key:
+      jira_custom_field_name:
+      type:
+    - spira_name:
+      jira_key:
+      jira_custom_field_name:
+      type:
+
+# Type mapping in a tree structure. What different jira types (leaves) maps to the spira types (root).
+# Is case sensitive.
+types:
+  # Program level, migrate_capabilities command
+  capabilities:
+    Initiative: Initiative
+    Epic: Epic
+  # Product level, migrate_issues command
+  requirements:
+    Initiative: Initiative
+    Epic: Epic
+    Story: Story
+  incidents:
+    Change Request: Change Request
+    Enhancement: Enhancement
+    Trouble Report: Trouble Report
+    Failure:
+      - Failure
+      - Bug
+  tasks:
+    Development: Development
+    Sub-Task:
+      - Sub-task
+      - Sub-story
+    Task: Task
+
+# The order must adhere to parent-child relations (starting with parents) for the hierarchies to work.
+capability_type_order:
+  - Initiative
+  - Epic
+# In what order we want to insert the different types of product artifacts. All jira_types specified in requirements, incidents, and tasks must be present.
+# The order must adhere to parent-child relations (starting with parents) for the hierarchies to work.
+# Is case sensitive.
+artifact_type_order:
+  - Initiative
+  - Epic
+  - Story
+  - Change Request
+  - Enhancement
+  - Trouble Report
+  - Failure
+  - Bug
+  - Development
+  - Task
+  - Sub-task
+  - Sub-story
