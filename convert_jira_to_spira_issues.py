@@ -107,7 +107,7 @@ def convert_jira_to_spira_issues(
                     "IsSuspect": False,  # False is the default value
                     # ProjectId - Suspected that it is derived from the projectid in the input, as it's populated when a GET of the artifact is made
                     # ConcurrencyDate - READ ONLY
-                    # Tags - ?
+                    "Tags": ",".join(map(str, issue["fields"]["labels"])),
                 }
 
                 # releaseid and componentid
@@ -218,7 +218,7 @@ def convert_jira_to_spira_issues(
                     # "IsAttachments":False,
                     # "Tags":? None,
                     # "Guid":None
-                    # Tags - ?
+                    "Tags": ",".join(map(str, issue["fields"]["labels"])),
                 }
 
                 task["artifact_type"] = "task"
@@ -307,7 +307,7 @@ def convert_jira_to_spira_issues(
                     # LastUpdateDate # READ ONLY - is read only, special solution needed with custom properties below.
                     # CreationDate # READ ONLY - is read only, special solution needed with custom properties below.
                     # ConcurrencyDate - READ ONLY
-                    # Tags - ?
+                    "Tags": ",".join(map(str, issue["fields"]["labels"])),
                     "ComponentIds": jira_component_to_spira_component_id(
                         spira_metadata["components"], issue, isComponentArray=True
                     ),  # - Array of component Ids
