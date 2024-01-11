@@ -343,7 +343,7 @@ def convert_jira_to_spira_issues(
 
 def find_spira_user_id_by_email(users, person_field, issue):
     if not issue["fields"][person_field]:
-        return None
+        return 1
     else:
         user = next(
             filter(
@@ -357,7 +357,7 @@ def find_spira_user_id_by_email(users, person_field, issue):
     if user:
         return user["UserId"]
     else:
-        return None
+        return 1
 
 
 def calculate_estimate_points(aggregatetimeoriginalestimate: int | None):
