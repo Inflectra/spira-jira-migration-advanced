@@ -1,0 +1,4 @@
+python-dotenv
+python-ldap
+rich
+pyyaml

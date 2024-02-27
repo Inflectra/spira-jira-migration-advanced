@@ -1,0 +1,6 @@
+# Spira mapping (left, key) to the different ldap attributes (right, value)
+Login: uid
+Email_Address: mail
+First_Name: givenName
+Middle_Initial: initials
+Last_Name: sn
