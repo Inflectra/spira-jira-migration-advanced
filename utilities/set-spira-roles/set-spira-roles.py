@@ -90,6 +90,7 @@ def main():
                     + str(user)
                     + "\n, could not be added as the required login id is missing"
                 )
+                continue
             username = user[1][mapping["Login"]][0].decode("utf-8")
             found_user = get_user_id_from_username(username, fetched_users)
             user_id = found_user["UserId"]
