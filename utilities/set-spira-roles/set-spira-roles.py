@@ -15,9 +15,9 @@ def main():
         description="Set spira roles from groups from an LDAP connection or from CSV files"
     )
 
-    parser.add_argument("project_id", type=int)
+    parser.add_argument("project_id", type=str)
 
-    parser.add_argument("role_id", type=int)
+    parser.add_argument("role_id", type=str)
 
     parser.add_argument("ldap_filter", type=str)
 
@@ -34,6 +34,9 @@ def main():
     # Start spira connection
     spira_connection_dict = get_spira_conn_dict()
     spira = get_spira_instance(spira_connection_dict, True)
+
+    project_id = get_spira_product_id_from_identifier(args.project_id, spira)
+    role_id = get_spira_role_id_from_identifier(args.role_id, spira)
 
     # Start LDAP connection
     # See if required env variables are present
@@ -61,7 +64,7 @@ def main():
 
     # Fetch spira users, needed for both LDAP and CSV usage.
     fetched_users = spira.get_all_users()
-    project_users = spira.get_all_project_users(args.project_id)
+    project_users = spira.get_all_project_users(project_id)
     project_roles = spira.get_all_project_roles()
 
     users = set()
@@ -77,7 +80,7 @@ def main():
         mapping_file = open("mapping.yaml", "r")
         mapping = yaml.safe_load(mapping_file)
 
-        role = get_project_role(args.role_id, project_roles)
+        role = get_project_role(role_id, project_roles)
 
         user_result = ldap_conn.search_s(
             os.getenv("LDAP_BASE_DN"), ldap.SCOPE_SUBTREE, args.ldap_filter
@@ -123,9 +126,7 @@ def main():
                     "Approved": True,  # This pre-approves the users
                 }
                 try:
-                    response = spira.create_user(
-                        user_payload, args.project_id, args.role_id
-                    )
+                    response = spira.create_user(user_payload, project_id, role_id)
                     if response.status_code > 399:
                         raise Exception
                     users_created.append(
@@ -144,13 +145,13 @@ def main():
                     continue
 
             payload = {
-                "ProjectId": args.project_id,
-                "ProjectRoleId": args.role_id,
+                "ProjectId": project_id,
+                "ProjectRoleId": role_id,
                 "UserId": user_id,
                 "UserName": username,
             }
 
-            result = spira.add_user_with_role_to_project(args.project_id, payload)
+            result = spira.add_user_with_role_to_project(project_id, payload)
             found_project_user = get_project_user(user_id, project_users)
 
             if result.status_code > 399:
@@ -186,11 +187,11 @@ def main():
                     print(result.text)
                     print("----------------------------------------")
             else:
-                role = get_project_role(args.role_id, project_roles)
+                role = get_project_role(role_id, project_roles)
                 users_role_set.append(
                     "[+] User: " + user + ", has been set to role: " + role["Name"]
                     if role is not None
-                    else "RoleNameNotFound" + ", with role id: " + str(args.role_id)
+                    else "RoleNameNotFound" + ", with role id: " + str(role_id)
                 )
 
         print("---** Users with roles set **---")
@@ -235,13 +236,13 @@ def main():
                 continue
 
             payload = {
-                "ProjectId": args.project_id,
-                "ProjectRoleId": args.role_id,
+                "ProjectId": project_id,
+                "ProjectRoleId": role_id,
                 "UserId": user_id,
                 "UserName": user,
             }
 
-            result = spira.add_user_with_role_to_project(args.project_id, payload)
+            result = spira.add_user_with_role_to_project(project_id, payload)
             found_project_user = get_project_user(user_id, project_users)
             if result.status_code > 399:
                 if (
@@ -263,11 +264,11 @@ def main():
                     print(result.text)
                     print("----------------------------------------")
             else:
-                role = get_project_role(args.role_id, project_roles)
+                role = get_project_role(role_id, project_roles)
                 users_role_set.append(
                     "[+] User: " + user + ", has been set to role: " + role["Name"]
                     if role is not None
-                    else "RoleNameNotFound" + ", with role id: " + str(args.role_id)
+                    else "RoleNameNotFound" + ", with role id: " + str(role_id)
                 )
 
         print("---** Users with roles set **---")
@@ -346,6 +347,48 @@ def get_spira_instance(spira_conn_dict, skip_ssl) -> Spira:
             "An error occured when trying to connect to the spira instance, please check that you have the correct variables set."
         )
         sys.exit(1)
+
+
+def get_spira_product_id_from_identifier(spira_product_identifier: str, spira) -> int:
+    # If string is actually an int and therefore the spira product_id
+    try:
+        product_id = int(spira_product_identifier)
+        return product_id
+    except Exception as e:
+        pass
+
+    # String is not an int, so script have to fetch the possible products and infer a product id from spira.
+    products = spira.get_projects()
+
+    found_product = next(
+        filter(lambda x: x["Name"] == spira_product_identifier, products)
+    )
+
+    if found_product is not None and found_product["ProjectId"] is not None:
+        return found_product["ProjectId"]
+    else:
+        return 0
+
+
+def get_spira_role_id_from_identifier(spira_role_identifier: str, spira) -> int:
+    # If the string is actually an int and therefore the spira role_id
+    try:
+        role_id = int(spira_role_identifier)
+        return role_id
+    except Exception as e:
+        pass
+
+    # String is not an int, so script have to fetch the possible roles and infer a role id from spira
+    project_roles = spira.get_all_projet_roles()
+
+    found_role = next(
+        filter(lambda x: x["Name"] == spira_role_identifier, project_roles)
+    )
+
+    if found_role is not None and found_role["ProjectRoleId"] is not None:
+        return found_role["ProjectRoleId"]
+    else:
+        return 0
 
 
 if __name__ == "__main__":

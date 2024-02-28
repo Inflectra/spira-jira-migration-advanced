@@ -110,3 +110,12 @@ class Spira:
         )
 
         return response.json()
+
+    def get_projects(self) -> Dict:
+        get_projects_url = self.base_url + "projects"
+
+        response = requests.request(
+            "GET", get_projects_url, headers=self.headers, verify=self.verify
+        )
+
+        return response.json()
