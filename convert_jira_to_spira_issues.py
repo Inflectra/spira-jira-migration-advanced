@@ -166,11 +166,9 @@ def convert_jira_to_spira_issues(
                         mapping_dict,
                     ),
                     # TaskFolderId: None,  # Not in plan to be developed right now
-                    "RequirementId": get_spira_id_from_jira_id(
-                        all_requirements_in_spira, issue["fields"]["parent"]["key"]
-                    )
-                    if "parent" in issue["fields"]
-                    else 0,
+                    "RequirementId": find_task_requirement_id(
+                        issue, all_requirements_in_spira, jira_metadata["customfields"]
+                    ),
                     "ReleaseId": jira_version_to_spira_release_id(
                         spira_metadata["releases"], issue
                     ),  # REQUIRED - the id of the release to connect to, releases in Spira must be prepared beforehand
@@ -339,6 +337,29 @@ def convert_jira_to_spira_issues(
     json.dump(validation_dict, to_validate, indent=4)
 
     to_validate.close()
+
+
+# Special case for finding the requirement id in tasks, as it can be commonly connected in a non-standard way by using the custom field "Epic Link".
+def find_task_requirement_id(issue, all_requirements_in_spira, jira_custom_fields):
+    if "parent" in issue["fields"]:
+        spira_id = get_spira_id_from_jira_id(
+            all_requirements_in_spira, issue["fields"]["parent"]["key"]
+        )
+        if spira_id is not None:
+            return spira_id
+        else:
+            return 0
+    else:
+        epic_link_jira_id = get_jira_data_from_custom_field(
+            issue, jira_custom_fields, "Epic Link"
+        )
+        spira_id = get_spira_id_from_jira_id(
+            all_requirements_in_spira, epic_link_jira_id
+        )
+        if spira_id is not None:
+            return spira_id
+        else:
+            return 0
 
 
 def find_spira_user_id_by_email(users, person_field, issue):
@@ -756,29 +777,35 @@ def jira_list_field_to_spira_custom_prop(
         custom_prop = {
             "PropertyNumber": custom_prop_data["PropertyNumber"],
             "StringValue": None,
-            "IntegerValue": jira_list_value_to_spira_id(
-                custom_prop_data["CustomList"]["Values"], issue_field_value
-            )
-            if issue_field_value
-            else None,
+            "IntegerValue": (
+                jira_list_value_to_spira_id(
+                    custom_prop_data["CustomList"]["Values"], issue_field_value
+                )
+                if issue_field_value
+                else None
+            ),
             "BooleanValue": None,
             "DateTimeValue": None,
             "DecimalValue": None,
             "IntegerListValue": None,
             "Definition": {
                 "CustomPropertyId": custom_prop_data["CustomPropertyId"],
-                "ProjectTemplateId": None
-                if artifact_type == "capability"
-                else spira_metadata["project"]["ProjectTemplateId"],
+                "ProjectTemplateId": (
+                    None
+                    if artifact_type == "capability"
+                    else spira_metadata["project"]["ProjectTemplateId"]
+                ),
                 "ArtifactTypeId": custom_prop_data["ArtifactTypeId"],
                 "Name": custom_prop_data["CustomList"]["Name"],
                 "CustomList": {
                     "CustomPropertyListId": custom_prop_data["CustomList"][
                         "CustomPropertyListId"
                     ],
-                    "ProjectTemplateId": None
-                    if artifact_type == "capability"
-                    else spira_metadata["project"]["ProjectTemplateId"],
+                    "ProjectTemplateId": (
+                        None
+                        if artifact_type == "capability"
+                        else spira_metadata["project"]["ProjectTemplateId"]
+                    ),
                     "Name": None,
                     "Active": False,
                     "SortedOnValue": False,
@@ -824,27 +851,33 @@ def jira_multiselect_list_field_to_spira_custom_prop(
             "BooleanValue": None,
             "DateTimeValue": None,
             "DecimalValue": None,
-            "IntegerListValue": jira_multi_list_values_to_spira_ids(
-                custom_prop_data["CustomList"]["Values"],
-                issue_field_value,
-                custom_prop_data["CustomList"]["Name"],
-            )
-            if issue_field_value
-            else None,
+            "IntegerListValue": (
+                jira_multi_list_values_to_spira_ids(
+                    custom_prop_data["CustomList"]["Values"],
+                    issue_field_value,
+                    custom_prop_data["CustomList"]["Name"],
+                )
+                if issue_field_value
+                else None
+            ),
             "Definition": {
                 "CustomPropertyId": custom_prop_data["CustomPropertyId"],
-                "ProjectTemplateId": None
-                if artifact_type == "capability"
-                else spira_metadata["project"]["ProjectTemplateId"],
+                "ProjectTemplateId": (
+                    None
+                    if artifact_type == "capability"
+                    else spira_metadata["project"]["ProjectTemplateId"]
+                ),
                 "ArtifactTypeId": custom_prop_data["ArtifactTypeId"],
                 "Name": custom_prop_data["CustomList"]["Name"],
                 "CustomList": {
                     "CustomPropertyListId": custom_prop_data["CustomList"][
                         "CustomPropertyListId"
                     ],
-                    "ProjectTemplateId": None
-                    if artifact_type == "capability"
-                    else spira_metadata["project"]["ProjectTemplateId"],
+                    "ProjectTemplateId": (
+                        None
+                        if artifact_type == "capability"
+                        else spira_metadata["project"]["ProjectTemplateId"]
+                    ),
                     "Name": None,
                     "Active": False,
                     "SortedOnValue": False,
@@ -896,9 +929,11 @@ def jira_datetime_field_to_spira_custom_prop(
             "IntegerListValue": None,
             "Definition": {
                 "CustomPropertyId": custom_prop_data["CustomPropertyId"],
-                "ProjectTemplateId": None
-                if artifact_type == "capability"
-                else spira_metadata["project"]["ProjectTemplateId"],
+                "ProjectTemplateId": (
+                    None
+                    if artifact_type == "capability"
+                    else spira_metadata["project"]["ProjectTemplateId"]
+                ),
                 "ArtifactTypeId": custom_prop_data["ArtifactTypeId"],
                 "Name": custom_prop_data["CustomPropertyFieldName"],
                 "CustomList": None,
@@ -942,9 +977,11 @@ def jira_string_field_to_spira_custom_prop(
             "IntegerListValue": None,
             "Definition": {
                 "CustomPropertyId": custom_prop_data["CustomPropertyId"],
-                "ProjectTemplateId": None
-                if artifact_type == "capability"
-                else spira_metadata["project"]["ProjectTemplateId"],
+                "ProjectTemplateId": (
+                    None
+                    if artifact_type == "capability"
+                    else spira_metadata["project"]["ProjectTemplateId"]
+                ),
                 "ArtifactTypeId": custom_prop_data["ArtifactTypeId"],
                 "Name": custom_prop_data["CustomPropertyFieldName"],
                 "CustomList": None,
@@ -988,9 +1025,11 @@ def jira_decimal_field_to_spira_custom_prop(
             "IntegerListValue": None,
             "Definition": {
                 "CustomPropertyId": custom_prop_data["CustomPropertyId"],
-                "ProjectTemplateId": None
-                if artifact_type == "capability"
-                else spira_metadata["project"]["ProjectTemplateId"],
+                "ProjectTemplateId": (
+                    None
+                    if artifact_type == "capability"
+                    else spira_metadata["project"]["ProjectTemplateId"]
+                ),
                 "ArtifactTypeId": custom_prop_data["ArtifactTypeId"],
                 "Name": custom_prop_data["CustomPropertyFieldName"],
                 "CustomList": None,
@@ -1041,9 +1080,11 @@ def jira_textarea_field_to_spira_custom_prop(
             "IntegerListValue": None,
             "Definition": {
                 "CustomPropertyId": custom_prop_data["CustomPropertyId"],
-                "ProjectTemplateId": None
-                if artifact_type == "capability"
-                else spira_metadata["project"]["ProjectTemplateId"],
+                "ProjectTemplateId": (
+                    None
+                    if artifact_type == "capability"
+                    else spira_metadata["project"]["ProjectTemplateId"]
+                ),
                 "ArtifactTypeId": custom_prop_data["ArtifactTypeId"],
                 "Name": custom_prop_data["CustomPropertyFieldName"],
                 "CustomList": None,
