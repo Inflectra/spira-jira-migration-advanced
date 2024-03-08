@@ -197,9 +197,16 @@ def convert_jira_to_spira_issues(
                         issue, jira_metadata["customfields"], "Target end"
                     ),
                     "CompletionPercent": 0,
-                    "EstimatedEffort": None,
+                    "EstimatedEffort": calculate_estimate_minutes(
+                        issue["fields"]["aggregatetimeoriginalestimate"]
+                    ),
+                    #"ActualEffort": calculate_estimate_minutes(
+                    #    issue["fields"]["aggregatetimeoriginalestimate"]
+                    #),
+                    "RemainingEffort": calculate_estimate_minutes(
+                        issue["fields"]["timeestimate"]
+                    ),
                     "ActualEffort": None,
-                    "RemainingEffort": None,
                     "ProjectedEffort": None,
                     "TaskStatusName": None,
                     "TaskTypeName": None,
@@ -298,7 +305,16 @@ def convert_jira_to_spira_issues(
                         issue, jira_metadata["customfields"], "Target end"
                     ),
                     # TODO "ClosedDate"
-                    # TODO - Something with the time and effort?
+                    # For Incidents & Tasks, estimated time has to be transformed from seconds to minutes
+                    "EstimatedEffort": calculate_estimate_minutes(
+                        issue["fields"]["aggregatetimeoriginalestimate"]
+                    ),
+                    #"ActualEffort": calculate_estimate_minutes(
+                    #    issue["fields"]["aggregatetimeoriginalestimate"]
+                    #),
+                    "RemainingEffort": calculate_estimate_minutes(
+                        issue["fields"]["timeestimate"]
+                    ),
                     # FixedBuildId - ?
                     # DetectedBuildId - ?
                     # ProjectId - Suspected that it is derived from the projectid in the input, as it's populated later when a GET of the artifact is made
@@ -380,13 +396,19 @@ def find_spira_user_id_by_email(users, person_field, issue):
     else:
         return 1
 
-
+## Requirements should get story points as is
 def calculate_estimate_points(aggregatetimeoriginalestimate: int | None):
     if aggregatetimeoriginalestimate is None:
         return None
     else:
         return round((aggregatetimeoriginalestimate / 3600) / 8, 2)
-
+    
+## Incidents and tasks should get the timeestimate in hours
+def calculate_estimate_minutes(aggregatetimeoriginalestimate: int | None):
+    if aggregatetimeoriginalestimate is None:
+        return None
+    else:
+        return aggregatetimeoriginalestimate // 60
 
 def get_jira_data_from_custom_field(issue, jira_custom_fields, jira_field_name):
     customfield = next(
