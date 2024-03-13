@@ -91,6 +91,10 @@ def main():
                 print(
                     "ERROR User:"
                     + str(user)
+                    + ", "
+                    + user[1][mapping]["Email_Address"][0].decode("utf-8")
+                    if mapping["Email_Address"] in user[1]
+                    else "NoEmailAddress"
                     + "\n, could not be added as the required login id is missing"
                 )
                 continue
@@ -132,7 +136,12 @@ def main():
                     users_created.append(
                         "[*] User: "
                         + str(username)
-                        + ", was added to this Spiraplan instance and project with role: "
+                        + ", "
+                        + user_payload["EmailAddress"]
+                        if user_payload["EmailAddress"] is not None
+                        else "NoEmailAddress"
+                        + ", "
+                        + "was added to this Spiraplan instance and project with role: "
                         + (role["Name"] if role is not None else "RoleNotFound")
                     )
                 except Exception as e:
@@ -164,6 +173,10 @@ def main():
                     users_already_member.append(
                         "[0] User: "
                         + str(username)
+                        + ", "
+                        + user[1][mapping]["Email_Address"][0].decode("utf-8")
+                        if mapping["Email_Address"] in user[1]
+                        else "NoEmailAddress"
                         + ", with role: "
                         + str(
                             found_project_user["ProjectRoleName"]
@@ -188,11 +201,26 @@ def main():
                     print("----------------------------------------")
             else:
                 role = get_project_role(role_id, project_roles)
-                users_role_set.append(
-                    "[+] User: " + user + ", has been set to role: " + role["Name"]
-                    if role is not None
-                    else "RoleNameNotFound" + ", with role id: " + str(role_id)
-                )
+
+                role_set_log_string = "[+] User: " + user + ", "
+
+                if mapping["Email_Address"] in user[1]:
+                    role_set_log_string + user[1][mapping]["Email_Address"][0].decode(
+                        "utf-8"
+                    )
+                else:
+                    role_set_log_string + "NoEmailAddress"
+
+                role_set_log_string + ", has been set to role: "
+
+                if role is not None:
+                    role_set_log_string + role["Name"]
+                else:
+                    role_set_log_string + "RoleNameNotFound"
+
+                role_set_log_string + ", with role id: " + str(role_id)
+
+                users_role_set.append(role_set_log_string)
 
         print("---** Users with roles set **---")
         print("---------------------------------------------------")
