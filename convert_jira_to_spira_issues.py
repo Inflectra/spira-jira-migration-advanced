@@ -197,16 +197,16 @@ def convert_jira_to_spira_issues(
                         issue, jira_metadata["customfields"], "Target end"
                     ),
                     "CompletionPercent": 0,
+                    # For Incidents & Tasks, EstEffort, ActualEffort and RemaningEffort has to be transformed from seconds to minutes
                     "EstimatedEffort": calculate_estimate_minutes(
                         issue["fields"]["aggregatetimeoriginalestimate"]
                     ),
-                    #"ActualEffort": calculate_estimate_minutes(
-                    #    issue["fields"]["aggregatetimeoriginalestimate"]
-                    #),
                     "RemainingEffort": calculate_estimate_minutes(
                         issue["fields"]["timeestimate"]
                     ),
-                    "ActualEffort": None,
+                    "ActualEffort": calculate_estimate_minutes(
+                        issue["fields"]["timespent"]
+                    ),
                     "ProjectedEffort": None,
                     "TaskStatusName": None,
                     "TaskTypeName": None,
@@ -305,13 +305,13 @@ def convert_jira_to_spira_issues(
                         issue, jira_metadata["customfields"], "Target end"
                     ),
                     # TODO "ClosedDate"
-                    # For Incidents & Tasks, estimated time has to be transformed from seconds to minutes
+                    # For Incidents & Tasks, EstEffort, ActualEffort and RemaningEffort has to be transformed from seconds to minutes
                     "EstimatedEffort": calculate_estimate_minutes(
                         issue["fields"]["aggregatetimeoriginalestimate"]
                     ),
-                    #"ActualEffort": calculate_estimate_minutes(
-                    #    issue["fields"]["aggregatetimeoriginalestimate"]
-                    #),
+                    "ActualEffort": calculate_estimate_minutes(
+                        issue["fields"]["timespent"]
+                    ),
                     "RemainingEffort": calculate_estimate_minutes(
                         issue["fields"]["timeestimate"]
                     ),
