@@ -15,16 +15,47 @@ def main():
         description="Set spira roles from groups from an LDAP connection or from CSV files"
     )
 
-    parser.add_argument("project_id", type=str)
+    subparsers = parser.add_subparsers(dest="command")
 
-    parser.add_argument("role_id", type=str)
+    # LDAP ADD command
+    parser_ldap_add_roles = subparsers.add_parser(
+        "add",
+        help="Adds the users and roles to the product, creates users if not exists, does not remove any rights or users.",
+    )
 
-    parser.add_argument("ldap_filter", type=str)
+    parser_ldap_add_roles.add_argument("project_id", type=str)
 
-    parser.add_argument(
-        "-csv",
-        "--csv-files",
-        help="CSV files to set roles from",
+    parser_ldap_add_roles.add_argument("role_id", type=str)
+
+    parser_ldap_add_roles.add_argument("ldap_filter", type=str)
+
+    # LDAP SET command
+
+    parser_ldap_set_roles = subparsers.add_parser(
+        "set",
+        help="Sets the users and roles to the product, creates users if not exists, removes user roles and rights if not in ldap.",
+    )
+
+    parser_ldap_set_roles.add_argument("project_id", type=str)
+
+    parser_ldap_set_roles.add_argument("role_id", type=str)
+
+    parser_ldap_set_roles.add_argument("ldap_filter", type=str)
+
+    # CSV command
+
+    parser_csv_set_roles = subparsers.add_parser(
+        "csv",
+        help="Sets the users roles on the product from a csv file, see example.csv for how to format it. Does not create users or remove roles.",
+    )
+
+    parser_csv_set_roles.add_argument("project_id", type=str)
+
+    parser_csv_set_roles.add_argument("role_id", type=str)
+
+    parser_csv_set_roles.add_argument(
+        "csv_files",
+        help="CSV files to set roles from, see example.csv for example csv file structure.",
         nargs="+",
         type=argparse.FileType("r", encoding="UTF-8"),
     )
@@ -40,7 +71,7 @@ def main():
 
     # Start LDAP connection
     # See if required env variables are present
-    if args.csv_files is None and (
+    if (args.command == "add" or args.command == "set") and (
         os.getenv("LDAP_ADDRESS") is None or os.getenv("LDAP_BASE_DN") is None
     ):
         print("No values supplied for ldap connection in the .env file, exiting...")
@@ -73,10 +104,10 @@ def main():
     users_created = []
     users_already_member = []
     users_role_set = []
-    users_role_removed = []  # TODO
+    users_role_removed = []
 
-    # LDAP case
-    if args.csv_files is None:
+    # LDAP add case
+    if args.command == "add":
         mapping_file = open("mapping.yaml", "r")
         mapping = yaml.safe_load(mapping_file)
 
@@ -242,8 +273,181 @@ def main():
 
         print("Finished role setting using LDAP connection, see above for details")
 
+    # LDAP set case
+    elif args.command == "set":
+        print("This command is not implemented yet, exiting...")
+        sys.exit(0)
+        mapping_file = open("mapping.yaml", "r")
+        mapping = yaml.safe_load(mapping_file)
+
+        role = get_project_role(role_id, project_roles)
+
+        user_result = ldap_conn.search_s(
+            os.getenv("LDAP_BASE_DN"), ldap.SCOPE_SUBTREE, args.ldap_filter
+        )
+        for user in track(user_result, "Processing LDAP users...", transient=True):
+            # The only required ldap field in Spiraplan is the "Login", or the userid/username.
+            if mapping["Login"] not in user[1]:
+                print(
+                    "ERROR User:"
+                    + str(user)
+                    + ", "
+                    + user[1][mapping]["Email_Address"][0].decode("utf-8")
+                    if mapping["Email_Address"] in user[1]
+                    else "NoEmailAddress"
+                    + "\n, could not be added as the required login id is missing"
+                )
+                continue
+            username = user[1][mapping["Login"]][0].decode("utf-8")
+            found_user = get_user_id_from_username(username, fetched_users)
+            user_id = found_user["UserId"]
+
+            # Check if user exist in SpiraPlan, else we add it.
+            if not found_user["UserId"]:
+                user_payload = {
+                    "UserName": user[1][mapping["Login"]][0].decode("utf-8"),
+                    "FirstName": (
+                        user[1][mapping["First_Name"]][0].decode("utf-8")
+                        if mapping["First_Name"] in user[1]
+                        else None
+                    ),
+                    "MiddleInitial": (
+                        user[1][mapping["Middle_Initial"]][0].decode("utf-8")
+                        if mapping["Middle_Initial"] in user[1]
+                        else None
+                    ),
+                    "LastName": (
+                        user[1][mapping["Last_Name"]][0].decode("utf-8")
+                        if mapping["Last_Name"] in user[1]
+                        else None
+                    ),
+                    "EmailAddress": (
+                        user[1][mapping["Email_Address"]][0].decode("utf-8")
+                        if mapping["Email_Address"] in user[1]
+                        else ""
+                    ),
+                    "LdapDn": user[0],
+                    "Approved": True,  # This pre-approves the users
+                }
+                try:
+                    response = spira.create_user(user_payload, project_id, role_id)
+                    if response.status_code > 399:
+                        raise Exception
+                    users_created.append(
+                        "[*] User: "
+                        + str(username)
+                        + ", "
+                        + user_payload["EmailAddress"]
+                        if user_payload["EmailAddress"] is not None
+                        else "NoEmailAddress"
+                        + ", "
+                        + "was added to this Spiraplan instance and project with role: "
+                        + (role["Name"] if role is not None else "RoleNotFound")
+                    )
+                except Exception as e:
+                    print(
+                        "ERROR User with payload: "
+                        + str(user_payload)
+                        + "\n, could not be created"
+                    )
+                finally:
+                    continue
+
+            # TODO Check if user already exists before in user_result, if with other role, remove it and add new role.
+
+            payload = {
+                "ProjectId": project_id,
+                "ProjectRoleId": role_id,
+                "UserId": user_id,
+                "UserName": username,
+            }
+
+            result = spira.add_user_with_role_to_project(project_id, payload)
+            found_project_user = get_project_user(user_id, project_users)
+
+            if result.status_code > 399:
+                if (
+                    result.text
+                    == '<string xmlns="http://schemas.microsoft.com/2003/10/Serialization/">The user is already a member of the product</string>'
+                    or result.text
+                    == '<string xmlns="http://schemas.microsoft.com/2003/10/Serialization/">ProjectDuplicateMembershipRecordException: That project membership row already exists!</string>'
+                ):
+                    users_already_member.append(
+                        "[0] User: "
+                        + str(username)
+                        + ", "
+                        + user[1][mapping]["Email_Address"][0].decode("utf-8")
+                        if mapping["Email_Address"] in user[1]
+                        else "NoEmailAddress"
+                        + ", with role: "
+                        + str(
+                            found_project_user["ProjectRoleName"]
+                            if found_project_user is not None
+                            else "ProjectRoleNameNotFound"
+                        )
+                        + ", and role id: "
+                        + str(
+                            found_project_user["ProjectRoleId"]
+                            if found_project_user is not None
+                            else "ProjectRoleIdNotFound"
+                        )
+                        + " already exists in product."
+                    )
+                else:
+                    print(
+                        "[ERR] Error when setting role for user with username: "
+                        + str(user)
+                    )
+                    print("Error ------------------------------------")
+                    print(result.text)
+                    print("----------------------------------------")
+            else:
+                role = get_project_role(role_id, project_roles)
+
+                role_set_log_string = "[+] User: " + user + ", "
+
+                if mapping["Email_Address"] in user[1]:
+                    role_set_log_string + user[1][mapping]["Email_Address"][0].decode(
+                        "utf-8"
+                    )
+                else:
+                    role_set_log_string + "NoEmailAddress"
+
+                role_set_log_string + ", has been set to role: "
+
+                if role is not None:
+                    role_set_log_string + role["Name"]
+                else:
+                    role_set_log_string + "RoleNameNotFound"
+
+                role_set_log_string + ", with role id: " + str(role_id)
+
+                users_role_set.append(role_set_log_string)
+
+        # TODO Remove roles from user and project if they are not part of the ldap group.
+
+        print("---** Users with roles set **---")
+        print("---------------------------------------------------")
+        for user in track(users_role_set, "Printing...", transient=True):
+            print(user)
+        print("---------------------------------------------------")
+
+        print("---** Users already members with role set. **---")
+        print("---------------------------------------------------")
+        for user in track(users_already_member, "Printing...", transient=True):
+            print(user)
+        print("---------------------------------------------------")
+
+        print("---** Users created from LDAP **---")
+        print("---------------------------------------------------")
+        for user in track(users_created, "Printing...", transient=True):
+            print(user)
+        print("---------------------------------------------------")
+
+        print("Finished role setting using LDAP connection, see above for details")
+
     # CSV case
-    else:
+    elif args.command == "csv":
         for csv_file in vars(args)["csv_files"]:
             reader = csv.reader(csv_file, delimiter=",", quotechar='"')
             next(reader)
@@ -317,6 +521,8 @@ def main():
             print(user)
         print("---------------------------------------------------")
         print("Finished role setting using CSV files, see above for details")
+    else:
+        print("No command supplied, exiting.")
 
 
 def get_user_id_from_username(username, fetched_users):
