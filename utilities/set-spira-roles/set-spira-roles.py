@@ -205,7 +205,7 @@ def main():
                         "[0] User: "
                         + str(username)
                         + ", "
-                        + user[1][mapping]["Email_Address"][0].decode("utf-8")
+                        + user[1][mapping["Email_Address"]][0].decode("utf-8")
                         if mapping["Email_Address"] in user[1]
                         else "NoEmailAddress"
                         + ", with role: "
@@ -613,7 +613,7 @@ def get_spira_role_id_from_identifier(spira_role_identifier: str, spira) -> int:
         pass
 
     # String is not an int, so script have to fetch the possible roles and infer a role id from spira
-    project_roles = spira.get_all_projet_roles()
+    project_roles = spira.get_all_project_roles()
 
     found_role = next(
         filter(lambda x: x["Name"] == spira_role_identifier, project_roles)
