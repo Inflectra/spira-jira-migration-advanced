@@ -46,6 +46,37 @@ class Spira:
 
         return response
 
+    def update_user_with_role_to_project(self, project_id, body):
+        update_user_and_role_url = (
+            self.base_url + "projects/" + str(project_id) + "/users"
+        )
+
+        payload = json.dumps(body)
+
+        response = requests.request(
+            "PUT",
+            update_user_and_role_url,
+            headers=self.headers,
+            data=payload,
+            verify=self.verify,
+        )
+
+        return response
+
+    def remove_user_with_role_from_project(self, project_id, user_id):
+        remove_user_with_role_from_project_url = (
+            self.base_url + "projects/" + str(project_id) + "/users/" + str(user_id)
+        )
+
+        response = requests.request(
+            "DELETE",
+            remove_user_with_role_from_project_url,
+            headers=self.headers,
+            verify=self.verify,
+        )
+
+        return response
+
     def create_user(
         self,
         body,

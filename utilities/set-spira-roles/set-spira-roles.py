@@ -64,7 +64,7 @@ def main():
 
     # Start spira connection
     spira_connection_dict = get_spira_conn_dict()
-    spira = get_spira_instance(spira_connection_dict, True)
+    spira: Spira = get_spira_instance(spira_connection_dict, True)
 
     project_id = get_spira_product_id_from_identifier(args.project_id, spira)
     role_id = get_spira_role_id_from_identifier(args.role_id, spira)
@@ -103,6 +103,7 @@ def main():
     users_does_not_exist = []
     users_created = []
     users_already_member = []
+    users_role_changed = []
     users_role_set = []
     users_role_removed = []
 
@@ -201,27 +202,76 @@ def main():
                     or result.text
                     == '<string xmlns="http://schemas.microsoft.com/2003/10/Serialization/">ProjectDuplicateMembershipRecordException: That project membership row already exists!</string>'
                 ):
-                    users_already_member.append(
-                        "[0] User: "
-                        + str(username)
-                        + ", "
-                        + user[1][mapping["Email_Address"]][0].decode("utf-8")
-                        if mapping["Email_Address"] in user[1]
-                        else "NoEmailAddress"
-                        + ", with role: "
-                        + str(
-                            found_project_user["ProjectRoleName"]
-                            if found_project_user is not None
-                            else "ProjectRoleNameNotFound"
+                    if (
+                        found_project_user is not None
+                        and "ProjectRoleId" in found_project_user
+                    ):
+                        found_project_user_role_id = found_project_user["ProjectRoleId"]
+                    else:
+                        found_project_user_role_id = 0
+
+                    # Check if the user already has the role so we can skip removing and readding it.
+                    if (
+                        found_project_user_role_id != 0
+                        and role_id == found_project_user_role_id
+                    ):
+                        users_already_member.append(
+                            "[0] User: "
+                            + str(username)
+                            + ", "
+                            + user[1][mapping["Email_Address"]][0].decode("utf-8")
+                            if mapping["Email_Address"] in user[1]
+                            else "NoEmailAddress"
+                            + ", with role: "
+                            + str(
+                                found_project_user["ProjectRoleName"]
+                                if found_project_user is not None
+                                else "ProjectRoleNameNotFound"
+                            )
+                            + ", and role id: "
+                            + str(
+                                found_project_user["ProjectRoleId"]
+                                if found_project_user is not None
+                                else "ProjectRoleIdNotFound"
+                            )
+                            + " already exists in product."
                         )
-                        + ", and role id: "
-                        + str(
-                            found_project_user["ProjectRoleId"]
-                            if found_project_user is not None
-                            else "ProjectRoleIdNotFound"
+                    else:
+                        update_result = spira.update_user_with_role_to_project(
+                            project_id, payload
                         )
-                        + " already exists in product."
-                    )
+                        if update_result.status_code > 399:
+                            print(
+                                "[ERR] Unknown error when trying to update user with role_id:"
+                                + str(user)
+                            )
+                            print("Error ------------------------------------")
+                            print(update_result.text)
+                            print("----------------------------------------")
+                        else:
+                            users_role_changed.append(
+                                "[o] User: "
+                                + str(username)
+                                + ", "
+                                + user[1][mapping["Email_Address"]][0].decode("utf-8")
+                                if mapping["Email_Address"] in user[1]
+                                else "NoEmailAddress"
+                                + ", with role: "
+                                + str(
+                                    found_project_user["ProjectRoleName"]
+                                    if found_project_user is not None
+                                    else "ProjectRoleNameNotFound"
+                                )
+                                + ", and role id: "
+                                + str(
+                                    found_project_user["ProjectRoleId"]
+                                    if found_project_user is not None
+                                    else "ProjectRoleIdNotFound"
+                                )
+                                + "was changed on this Spiraplan instance and project and updated to role: "
+                                + (role["Name"] if role is not None else "RoleNotFound")
+                            )
+
                 else:
                     print(
                         "[ERR] Error when setting role for user with username: "
@@ -256,6 +306,12 @@ def main():
         print("---** Users with roles set **---")
         print("---------------------------------------------------")
         for user in track(users_role_set, "Printing...", transient=True):
+            print(user)
+        print("---------------------------------------------------")
+
+        print("---** Users with roles changed **---")
+        print("---------------------------------------------------")
+        for user in track(users_role_changed, "Printing...", transient=True):
             print(user)
         print("---------------------------------------------------")
 
@@ -372,27 +428,76 @@ def main():
                     or result.text
                     == '<string xmlns="http://schemas.microsoft.com/2003/10/Serialization/">ProjectDuplicateMembershipRecordException: That project membership row already exists!</string>'
                 ):
-                    users_already_member.append(
-                        "[0] User: "
-                        + str(username)
-                        + ", "
-                        + user[1][mapping]["Email_Address"][0].decode("utf-8")
-                        if mapping["Email_Address"] in user[1]
-                        else "NoEmailAddress"
-                        + ", with role: "
-                        + str(
-                            found_project_user["ProjectRoleName"]
-                            if found_project_user is not None
-                            else "ProjectRoleNameNotFound"
+                    if (
+                        found_project_user is not None
+                        and "ProjectRoleId" in found_project_user
+                    ):
+                        found_project_user_role_id = found_project_user["ProjectRoleId"]
+                    else:
+                        found_project_user_role_id = 0
+
+                    # Check if the user already has the role so we can skip removing and readding it.
+                    if (
+                        found_project_user_role_id != 0
+                        and role_id == found_project_user_role_id
+                    ):
+                        users_already_member.append(
+                            "[0] User: "
+                            + str(username)
+                            + ", "
+                            + user[1][mapping["Email_Address"]][0].decode("utf-8")
+                            if mapping["Email_Address"] in user[1]
+                            else "NoEmailAddress"
+                            + ", with role: "
+                            + str(
+                                found_project_user["ProjectRoleName"]
+                                if found_project_user is not None
+                                else "ProjectRoleNameNotFound"
+                            )
+                            + ", and role id: "
+                            + str(
+                                found_project_user["ProjectRoleId"]
+                                if found_project_user is not None
+                                else "ProjectRoleIdNotFound"
+                            )
+                            + " already exists in product."
                         )
-                        + ", and role id: "
-                        + str(
-                            found_project_user["ProjectRoleId"]
-                            if found_project_user is not None
-                            else "ProjectRoleIdNotFound"
+                    else:
+                        update_result = spira.update_user_with_role_to_project(
+                            project_id, payload
                         )
-                        + " already exists in product."
-                    )
+                        if update_result.status_code > 399:
+                            print(
+                                "[ERR] Unknown error when trying to update user with role_id:"
+                                + str(user)
+                            )
+                            print("Error ------------------------------------")
+                            print(update_result.text)
+                            print("----------------------------------------")
+                        else:
+                            users_role_changed.append(
+                                "[o] User: "
+                                + str(username)
+                                + ", "
+                                + user[1][mapping["Email_Address"]][0].decode("utf-8")
+                                if mapping["Email_Address"] in user[1]
+                                else "NoEmailAddress"
+                                + ", with role: "
+                                + str(
+                                    found_project_user["ProjectRoleName"]
+                                    if found_project_user is not None
+                                    else "ProjectRoleNameNotFound"
+                                )
+                                + ", and role id: "
+                                + str(
+                                    found_project_user["ProjectRoleId"]
+                                    if found_project_user is not None
+                                    else "ProjectRoleIdNotFound"
+                                )
+                                + "was changed on this Spiraplan instance and project and updated to role: "
+                                + (role["Name"] if role is not None else "RoleNotFound")
+                            )
+
                 else:
                     print(
                         "[ERR] Error when setting role for user with username: "
@@ -429,6 +534,12 @@ def main():
         print("---** Users with roles set **---")
         print("---------------------------------------------------")
         for user in track(users_role_set, "Printing...", transient=True):
+            print(user)
+        print("---------------------------------------------------")
+
+        print("---** Users with roles changed **---")
+        print("---------------------------------------------------")
+        for user in track(users_role_changed, "Printing...", transient=True):
             print(user)
         print("---------------------------------------------------")
 
