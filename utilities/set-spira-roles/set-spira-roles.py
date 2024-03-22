@@ -151,7 +151,7 @@ def main():
                     "ERROR User:"
                     + str(user)
                     + ", "
-                    + user[1][mapping]["Email_Address"][0].decode("utf-8")
+                    + user[1][mapping["Email_Address"]][0].decode("utf-8")
                     if mapping["Email_Address"] in user[1]
                     else "NoEmailAddress"
                     + "\n, could not be added as the required login id is missing"
@@ -310,10 +310,10 @@ def main():
             else:
                 role = get_project_role(role_id, project_roles)
 
-                role_set_log_string = "[+] User: " + user + ", "
+                role_set_log_string = "[+] User: " + str(username) + ", "
 
                 if mapping["Email_Address"] in user[1]:
-                    role_set_log_string + user[1][mapping]["Email_Address"][0].decode(
+                    role_set_log_string + user[1][mapping["Email_Address"]][0].decode(
                         "utf-8"
                     )
                 else:
@@ -368,6 +368,7 @@ def main():
         user_result = ldap_conn.search_s(
             os.getenv("LDAP_BASE_DN"), ldap.SCOPE_SUBTREE, args.ldap_filter
         )
+
         for user in track(user_result, "Processing LDAP users...", transient=True):
             # The only required ldap field in Spiraplan is the "Login", or the userid/username.
             if mapping["Login"] not in user[1]:
@@ -375,7 +376,7 @@ def main():
                     "ERROR User:"
                     + str(user)
                     + ", "
-                    + user[1][mapping]["Email_Address"][0].decode("utf-8")
+                    + user[1][mapping["Email_Address"]][0].decode("utf-8")
                     if mapping["Email_Address"] in user[1]
                     else "NoEmailAddress"
                     + "\n, could not be added as the required login id is missing"
@@ -436,16 +437,12 @@ def main():
                 finally:
                     continue
 
-            # TODO Check if user already exists before in user_result, if with other role, remove it and add new role.
-
             payload = {
                 "ProjectId": int(project_id),
                 "ProjectRoleId": int(role_id),
                 "UserId": int(user_id),
                 "UserName": username,
             }
-
-            print(payload)
 
             result = spira.add_user_with_role_to_project(project_id, payload)
             found_project_user = get_project_user(user_id, project_users)
@@ -539,10 +536,10 @@ def main():
             else:
                 role = get_project_role(role_id, project_roles)
 
-                role_set_log_string = "[+] User: " + user + ", "
+                role_set_log_string = "[+] User: " + str(username) + ", "
 
                 if mapping["Email_Address"] in user[1]:
-                    role_set_log_string + user[1][mapping]["Email_Address"][0].decode(
+                    role_set_log_string + user[1][mapping["Email_Address"]][0].decode(
                         "utf-8"
                     )
                 else:
@@ -569,6 +566,8 @@ def main():
             # If the user exists and has a UserId and is not the system administrator account that is on every project
             if user and "UserName" in user and user["UserName"] == "administrator":
                 print("Administrator username present, it is not removed from project")
+                users_to_remove.remove(user)
+                continue
 
             if user and "UserId" in user:
                 result = spira.remove_user_with_role_from_project(
@@ -592,7 +591,7 @@ def main():
                         + str(user["ProjectRoleName"])
                         + ", and role id: "
                         + str(user["ProjectRoleId"])
-                        + "was removed from this project on this Spiraplan instance and project."
+                        + " was removed from this project on this Spiraplan instance and project."
                     )
 
         print("---** Users with roles set **---")
