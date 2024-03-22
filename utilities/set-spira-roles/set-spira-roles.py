@@ -29,6 +29,15 @@ def main():
 
     parser_ldap_add_roles.add_argument("ldap_filter", type=str)
 
+    parser_ldap_add_roles.add_argument(
+        "-nossl",
+        "--skip-ssl-check",
+        help="Skip the ssl check on the spira instance",
+        action=argparse.BooleanOptionalAction,
+        type=bool,
+        default=False,
+    )
+
     # LDAP SET command
 
     parser_ldap_set_roles = subparsers.add_parser(
@@ -41,6 +50,15 @@ def main():
     parser_ldap_set_roles.add_argument("role_id", type=str)
 
     parser_ldap_set_roles.add_argument("ldap_filter", type=str)
+
+    parser_ldap_set_roles.add_argument(
+        "-nossl",
+        "--skip-ssl-check",
+        help="Skip the ssl check on the spira instance",
+        action=argparse.BooleanOptionalAction,
+        type=bool,
+        default=False,
+    )
 
     # CSV command
 
@@ -60,11 +78,20 @@ def main():
         type=argparse.FileType("r", encoding="UTF-8"),
     )
 
+    parser_csv_set_roles.add_argument(
+        "-nossl",
+        "--skip-ssl-check",
+        help="Skip the ssl check on the spira instance",
+        action=argparse.BooleanOptionalAction,
+        type=bool,
+        default=False,
+    )
+
     args = parser.parse_args()
 
     # Start spira connection
     spira_connection_dict = get_spira_conn_dict()
-    spira: Spira = get_spira_instance(spira_connection_dict, True)
+    spira: Spira = get_spira_instance(spira_connection_dict, args.skip_ssl_check)
 
     project_id = get_spira_product_id_from_identifier(args.project_id, spira)
     role_id = get_spira_role_id_from_identifier(args.role_id, spira)
@@ -331,12 +358,12 @@ def main():
 
     # LDAP set case
     elif args.command == "set":
-        print("This command is not implemented yet, exiting...")
-        sys.exit(0)
         mapping_file = open("mapping.yaml", "r")
         mapping = yaml.safe_load(mapping_file)
 
         role = get_project_role(role_id, project_roles)
+
+        users_to_remove = project_users.copy()
 
         user_result = ldap_conn.search_s(
             os.getenv("LDAP_BASE_DN"), ldap.SCOPE_SUBTREE, args.ldap_filter
@@ -412,11 +439,13 @@ def main():
             # TODO Check if user already exists before in user_result, if with other role, remove it and add new role.
 
             payload = {
-                "ProjectId": project_id,
-                "ProjectRoleId": role_id,
-                "UserId": user_id,
+                "ProjectId": int(project_id),
+                "ProjectRoleId": int(role_id),
+                "UserId": int(user_id),
                 "UserName": username,
             }
+
+            print(payload)
 
             result = spira.add_user_with_role_to_project(project_id, payload)
             found_project_user = get_project_user(user_id, project_users)
@@ -462,6 +491,7 @@ def main():
                             )
                             + " already exists in product."
                         )
+
                     else:
                         update_result = spira.update_user_with_role_to_project(
                             project_id, payload
@@ -501,7 +531,7 @@ def main():
                 else:
                     print(
                         "[ERR] Error when setting role for user with username: "
-                        + str(user)
+                        + str(username)
                     )
                     print("Error ------------------------------------")
                     print(result.text)
@@ -529,7 +559,41 @@ def main():
 
                 users_role_set.append(role_set_log_string)
 
-        # TODO Remove roles from user and project if they are not part of the ldap group.
+            # Remove the user if we found it in the ldap search
+            remove_user_from_list(users_to_remove, user_id)
+
+        # Remove users roles from this project if they were not in the ldap group search.
+        for user in track(
+            users_to_remove, "Processing removing users from project...", transient=True
+        ):
+            # If the user exists and has a UserId and is not the system administrator account that is on every project
+            if user and "UserName" in user and user["UserName"] == "administrator":
+                print("Administrator username present, it is not removed from project")
+
+            if user and "UserId" in user:
+                result = spira.remove_user_with_role_from_project(
+                    project_id, int(user["UserId"])
+                )
+                if result.status_code > 399:
+                    print(
+                        "[ERR] Error when removing role for this project for user with username: "
+                        + str(user["UserName"])
+                    )
+                    print("Error ------------------------------------")
+                    print(result.text)
+                    print("----------------------------------------")
+                else:
+                    users_role_removed.append(
+                        "[X] User: "
+                        + str(user["UserName"])
+                        + ", "
+                        + str(user["EmailAddress"])
+                        + ", with role: "
+                        + str(user["ProjectRoleName"])
+                        + ", and role id: "
+                        + str(user["ProjectRoleId"])
+                        + "was removed from this project on this Spiraplan instance and project."
+                    )
 
         print("---** Users with roles set **---")
         print("---------------------------------------------------")
@@ -540,6 +604,12 @@ def main():
         print("---** Users with roles changed **---")
         print("---------------------------------------------------")
         for user in track(users_role_changed, "Printing...", transient=True):
+            print(user)
+        print("---------------------------------------------------")
+
+        print("---** Users with roles removed from this project **---")
+        print("---------------------------------------------------")
+        for user in track(users_role_removed, "Printing...", transient=True):
             print(user)
         print("---------------------------------------------------")
 
@@ -658,6 +728,14 @@ def get_project_role(role_id, project_roles):
     for role in project_roles:
         if role["ProjectRoleId"] == role_id:
             return role
+
+
+# Removes first occurence of a user from a supplied list of project users from spira if the user exists by their UserId.
+def remove_user_from_list(project_users, user_id):
+    for user in project_users:
+        if user and "UserId" in user and user_id == user["UserId"]:
+            project_users.remove(user)
+            break
 
 
 def get_spira_conn_dict():
